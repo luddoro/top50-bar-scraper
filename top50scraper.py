@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -98,9 +99,9 @@ def fetch_and_parse(url):
     return extracted_bars
 
 def extract_year_from_url(url):
-    """Extracts the 4-digit year from the URL, or defaults to 'Latest'."""
-    match = re.search(r'/(\d{4})/', url)
-    return match.group(1) if match else "Latest"
+    """Extracts the 4-digit year from the URL, or defaults to the current year."""
+    match = re.search(r'/((?:19|20)\d{2})(?:/|$)', url)
+    return match.group(1) if match else str(datetime.now().year)
 
 # 2. CONCURRENCY: Fetch all URLs simultaneously
 all_extracted_bars = []
@@ -142,13 +143,18 @@ for bar in all_extracted_bars:
             
         unique_bars_dict[name] = entry
         
-    # If the bar already exists, check if this new rank is better (a lower number)
+    # If the bar already exists, update if this new rank is better (a lower number)
+    # or if the new information carries a more specific year for the same rank.
     else:
-        if current_rank < unique_bars_dict[name]["highest_rank"]:
+        existing_entry = unique_bars_dict[name]
+        if current_rank < existing_entry["highest_rank"]:
             # Overwrite with the better rank data
-            unique_bars_dict[name]["highest_rank"] = current_rank
-            unique_bars_dict[name]["year"] = year
-            unique_bars_dict[name]["source_url"] = url
+            existing_entry["highest_rank"] = current_rank
+            existing_entry["year"] = year
+            existing_entry["source_url"] = url
+        elif current_rank == existing_entry["highest_rank"] and year != existing_entry["year"]:
+            existing_entry["year"] = year
+            existing_entry["source_url"] = url
 
 # 4. Export to JSON
 final_bars_list = list(unique_bars_dict.values())
