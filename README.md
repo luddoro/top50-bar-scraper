@@ -51,3 +51,21 @@ The script will write the results to the file specified by `OUTPUT_FILE` (defaul
 
 ## Output
 The generated JSON contains each bar's name, location, highest rank, year, and source URL.
+
+## Enrich with OpenStreetMap
+You can also enrich the scraped data with OpenStreetMap details such as latitude/longitude, a display address, and place metadata.
+
+### 1. Optional: set a custom user agent
+If you want, you can add a custom user-agent to your `.env` file:
+
+```env
+OSM_USER_AGENT=your-app-name/1.0
+```
+
+### 2. Run the enrichment script
+
+```bash
+python osm_enricher.py
+```
+
+This will read the scraped data from `50_best_bars_highest_rank.json` and write the enriched output to `50_best_bars_with_osm.json`.

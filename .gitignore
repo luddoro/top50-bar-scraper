@@ -6,3 +6,4 @@ pyvenv.cfg
 *.json
 .env
 .venv/
+\bar-images
