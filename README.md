@@ -68,4 +68,8 @@ OSM_USER_AGENT=your-app-name/1.0
 python osm_enricher.py
 ```
 
+Notes:
+- The enricher uses the Nominatim (OpenStreetMap) API and enforces a default rate limit of 4 requests per minute to avoid being rate-limited. You can change this with `--rate-per-minute`.
+- Requests are performed sequentially (no concurrency) and the script will skip bars that already contain `openstreetmap` data in the input JSON.
+
 This will read the scraped data from `50_best_bars_highest_rank.json` and write the enriched output to `50_best_bars_with_osm.json`.

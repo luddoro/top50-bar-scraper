@@ -122,6 +122,7 @@ def main():
     parser.add_argument("--input", default="50_best_bars_highest_rank.json", help="Path to the input JSON file")
     parser.add_argument("--output", default="50_best_bars_with_osm.json", help="Path to write the enriched JSON file")
     parser.add_argument("--timeout", type=int, default=20, help="HTTP timeout in seconds")
+    parser.add_argument("--rate-per-minute", type=int, default=4, help="Maximum requests per minute to Nominatim (default 4)")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -131,10 +132,43 @@ def main():
     with input_path.open("r", encoding="utf-8") as handle:
         bars = json.load(handle)
 
+    interval = 60.0 / float(args.rate_per_minute) if args.rate_per_minute > 0 else 15.0
+    last_call = 0.0
+
     enriched_bars = []
     for index, bar in enumerate(bars, start=1):
-        print(f"[{index}/{len(bars)}] Searching: {bar.get('name')}")
-        enriched_bars.append(enrich_bar(bar, timeout=args.timeout))
+        # Skip if we already have OSM data present
+        existing = bar.get("openstreetmap")
+        if existing and existing.get("status") == "ok":
+            print(f"[{index}/{len(bars)}] Skipping '{bar.get('name')}' — already has OpenStreetMap data")
+            enriched_bars.append(bar)
+            continue
+
+        # rate limit: ensure interval between requests
+        elapsed = time.time() - last_call
+        if elapsed < interval:
+            to_wait = interval - elapsed
+            print(f"Waiting {to_wait:.1f}s to respect rate limit before querying '{bar.get('name')}'")
+            time.sleep(to_wait)
+
+        print(f"[{index}/{len(bars)}] Querying OpenStreetMap for: {bar.get('name')}")
+        result = enrich_bar(bar, timeout=args.timeout)
+        last_call = time.time()
+
+        osm = result.get("openstreetmap", {})
+        status = osm.get("status")
+        if status == "request_error":
+            # wait 60s and retry once
+            print(f"Request error for '{bar.get('name')}', waiting 60s and retrying once...")
+            time.sleep(60)
+            # respect rate limit again
+            elapsed = time.time() - last_call
+            if elapsed < interval:
+                time.sleep(interval - elapsed)
+            result = enrich_bar(bar, timeout=args.timeout)
+            last_call = time.time()
+
+        enriched_bars.append(result)
 
     output_path = Path(args.output)
     with output_path.open("w", encoding="utf-8") as handle:
